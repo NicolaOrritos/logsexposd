@@ -1,10 +1,10 @@
 # Requires here:
-# require 'socket'
+require 'socket'
 
 
 # Set the TCP server here:
-# port = 10001
-# server = TCPServer.new("localhost", port)
+port = 10001
+server = TCPServer.new("localhost", port)
 
 
 # XML stuff here:
@@ -30,7 +30,10 @@ files_lines = {}
 
 
 # Real stuff from here on:
-loop do
+while (session = server.accept) do
+	
+	# DEBUG Let them know we are up and alive:
+	puts "Serving request"
 	
 	rss_body = ""
 	
@@ -99,12 +102,12 @@ loop do
 	
 	
 	# Let's output the result of our efforts (rewrites the file every time we find changes!):
-	File.open("rss.xml", 'w') do |file|
-		file.write(RSS_PRE + rss_body + RSS_POST)
-	end
+	response_body = RSS_PRE + rss_body + RSS_POST
 	
 	
-	sleep EXECUTION_INTERVAL
+	session.print(response_body)
+	
+	session.close
 	
 end
 

@@ -1,6 +1,7 @@
 # Requires here:
 require 'socket'
 require 'date'
+require 'rss'
 
 
 # Set the TCP server here:
@@ -97,7 +98,7 @@ while (session = server.accept) do
 								<link>#none</link>
 								<description>"
 					
-					rss_item += line
+					rss_item += RSS::Utils.html_escape(line)
 					
 					rss_item += "</description></item>"
 					

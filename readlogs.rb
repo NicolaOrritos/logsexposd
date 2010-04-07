@@ -1,5 +1,6 @@
 # Requires here:
 require 'socket'
+require 'date'
 
 
 # Set the TCP server here:
@@ -28,13 +29,22 @@ EXECUTION_INTERVAL = 10 	# interval is in seconds
 rss = ""
 files_mtimes = {}
 files_lines = {}
+files_firstline_hashes = {}
 
 Dir[FILES_PATTERN].each do |file_path|
 	file_mtime = File.mtime(file_path)
 	files_mtimes[file_path] = file_mtime
 
 	count = 0
-	File.open(file_path).each {count += 1}
+	File.open(file_path).each do |line|
+		
+		if (count == 0)
+			files_firstline_hashes[file_path] = line.hash
+		end
+		
+		count += 1
+	end
+	
 	files_lines[file_path] = count
 
 	# DEBUG
@@ -46,57 +56,57 @@ end
 while (session = server.accept) do
 	
 	# DEBUG Let them know we are up and alive:
-	puts "Serving request"
+	time = Time.now.to_s
+	puts ("Serving request at " + time)
 	
 	rss_body = ""
-	rss_buffer_body = ""
 	
 	Dir[FILES_PATTERN].each do |file_path|
 		# First of all take note of the file's mtime:
 		file_mtime = File.mtime(file_path)
 		
+		# Then initialize some auxiliary variables:
+		has_rotated = false
+		
+		# Check whether the file has changed since last run:
 		if (files_mtimes[file_path] < file_mtime)
 			# Initialize the variables used to track the changes:
+			# 1. the mtime-s are used to track the last time the file has been modified
+			# 2. 'count' counts the number of lines of the file
 			files_mtimes[file_path] = file_mtime
 			count = 0
 			
 			File.open(file_path).each do |line|
 				
+				# Check whether the log has been rotated by analysing its first line:
+				if (count == 0)
+					if (files_firstline_hashes[file_path] == line.hash)
+						has_rotated = true
+					end
+				end
+				
+				
 				count += 1
 				
-				rss_item = "<item>
-							<title>#{file_path} at #{file_mtime} [line #{count}]</title>
-							<link>#none</link>
-							<description>"
 				
-				rss_item += line
-				
-				rss_item += "</description></item>"
-				
-				if (count >= files_lines[file_path])
-					# DEBUG
-					puts ("[The following line in output as *normal* RSS body:]\n#{line}")
+				# If log has rotated log every line of the file,
+				# otherwise get only the new lines
+				if (has_rotated or count >= files_lines[file_path])
+					rss_item = "<item>
+								<title>#{file_path} at #{file_mtime} [line #{count}]</title>
+								<link>#none</link>
+								<description>"
+					
+					rss_item += line
+					
+					rss_item += "</description></item>"
 					
 					# This way we ensure the last lines are showed first
 					rss_body = rss_item + rss_body
-				else
-					# DEBUG
-					puts ("[The following line in output as *buffered* RSS body:]\n#{line}")
-					
-					# This buffered body will only be used if the log has been rotated:
-					rss_buffer_body = rss_item + rss_buffer_body
 				end
 			end
 			
-			
-			# Corner-case: logs could be rotated,
-			# hence the new ".log" could have fewer lines
-			# than the number saved in files_lines[]
-			if (count < files_lines[file_path])
-				rss_body += rss_buffer_body
-			end
-			
-			
+			# Save the new number of lines of the file:
 			files_lines[file_path] = count
 		end
 	
@@ -107,7 +117,7 @@ while (session = server.accept) do
 	rss = rss_body + rss
 	
 	
-	# Let's output the result of our efforts (rewrites the file every time we find changes!):
+	# Let's output the result of our efforts:
 	response_body = RSS_PRE + rss + RSS_POST
 	
 	

@@ -1,0 +1,8 @@
+= logsexposd
+
+logsexposd is a daemon which offers an updated RSS of most recent logs in /var/log/.
+Logs are parsed on demand.
+logsexposd is in an early alpha stage of development: use it at your own risk!
+
+== Usage
+sudo ruby readlogs.rb

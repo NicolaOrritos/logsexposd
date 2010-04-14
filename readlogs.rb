@@ -23,7 +23,7 @@ RSS_POST = "</channel></rss>"
 
 # Configuration constants here:
 FILES_PATTERN = "/var/log/*.log"
-EXECUTION_INTERVAL = 10 	# interval is in seconds
+EXECUTION_INTERVAL = 6 	# interval is in seconds
 RSS_FILE_NAME = "rss.xml"
 
 
@@ -56,15 +56,15 @@ end
 
 # First of all we start the thread responsible for indexing the log files
 # and writing the results as RSS to a file:
-Thread.start() do
+Thread.start(rss) do |rss|
 	# Execute indefinitely
 	loop do
 		rss_body = ""
-	
+		
 		Dir[FILES_PATTERN].each do |file_path|
 			# First of all take note of the file's mtime:
 			file_mtime = File.mtime(file_path)
-		
+			
 			# Then initialize some auxiliary variables:
 			has_rotated = false
 		
@@ -75,12 +75,18 @@ Thread.start() do
 				# 2. 'count' counts the number of lines of the file
 				files_mtimes[file_path] = file_mtime
 				count = 0
-			
+
+				# DEBUG
+				puts ("Found that mtime has changes for '#{file_path}'")
+				
 				File.open(file_path).each do |line|
 				
 					# Check whether the log has been rotated by analysing its first line:
 					if (count == 0)
 						if (files_firstline_hashes[file_path] != line.hash)
+							# DEBUG
+							puts ("Found that '#{file_path}' has rotated")
+							
 							has_rotated = true
 						end
 					end
@@ -116,11 +122,17 @@ Thread.start() do
 		# Now incrementally increase the RSS being output with the newly added elements:
 		rss = rss_body + rss
 		
-		# Check if first execution:
-		if ( ! File.exists?  RSS_FILE_NAME )
-			File.open(RSS_FILE_NAME, File::WRONLY) do |file|
-				file.write(RSS_PRE + rss + RSS_POST)
-			end
+
+		# DEBUG
+		puts ("Parsed the logs and produced the following: \n#{rss}")
+		
+		
+		File.open(RSS_FILE_NAME, "w") do |file|
+			
+			# DEBUG
+			puts ("Writing to file #{RSS_FILE_NAME}")
+			
+			file.write(RSS_PRE + rss + RSS_POST)
 		end
 		
 		
@@ -130,7 +142,7 @@ Thread.start() do
 end
 
 
-# This threads accept connections and serve the RSS file we created:
+# These threads accept connections and serve the RSS file we created:
 loop do
 	Thread.start(server.accept) do |session|
 		# DEBUG Let's know we are up and alive:
@@ -138,8 +150,7 @@ loop do
 		puts ("Serving request at " + time)
 	
 		if (File.exists? RSS_FILE_NAME)
-			# TODO
-			session.print(response_body)
+			session.print(IO.read(RSS_FILE_NAME))
 		end
 	
 		session.close

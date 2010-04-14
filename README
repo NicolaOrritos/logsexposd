@@ -1,7 +1,7 @@
 = logsexposd
 
 logsexposd is a daemon which offers an updated RSS of the most recent logs in /var/log/.
-Logs are parsed on demand.
+Logs are parsed in background every N seconds (with N customizable).
 logsexposd is in an early alpha stage of development: use it at your own risk!
 
 == Usage
